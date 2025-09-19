@@ -102,8 +102,9 @@ resource "bloxone_ipam_subnet" "infoblox_subnets" {
 }
 
 resource "time_sleep" "wait_for_infoblox" {
+  for_each        = toset(var.vnets)
   depends_on      = [bloxone_ipam_subnet.infoblox_subnets]
-  create_duration = "5s"
+  create_duration = "2s"
 }
 
 # Reserviere .1, .2, .3 als „vergeben“ durch Host-Objekte
@@ -125,5 +126,5 @@ resource "bloxone_ipam_host" "reserved_ips" {
   comment = each.value.comment
   tags    = var.subnet_tags
 
-  depends_on = [time_sleep.wait_for_infoblox]
+  depends_on = [time_sleep.wait_for_infoblox[each.value.vnet]]
 }
