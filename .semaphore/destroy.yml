@@ -10,22 +10,10 @@ blocks:
   - name: "Terraform Destroy"
     task:
       env_vars:
-        - name: TF_VAR_subscription_id
-          from_secret: AZURE_SUBSCRIPTION_ID
-        - name: TF_VAR_tenant_id
-          from_secret: AZURE_TENANT_ID
-        - name: TF_VAR_client_id
-          from_secret: AZURE_CLIENT_ID
-        - name: TF_VAR_client_secret
-          from_secret: AZURE_CLIENT_SECRET
-        - name: TF_VAR_csp_url
-          from_secret: INFOBLOX_CSP_URL
-        - name: TF_VAR_api_key
-          from_secret: INFOBLOX_API_KEY
         - name: TF_VAR_region
           value: "West Europe"
         - name: TF_VAR_resource_group
-          value: "blox42-rg"
+          value: "infra-se-ui"
         - name: TF_VAR_infoblox_address_block_name
           value: "Azure VNET Address Block"
         - name: TF_VAR_vnet_prefix
@@ -38,6 +26,8 @@ blocks:
           value: "Terraform Demo Entry via Semaphore CI/CD"
         - name: TF_VAR_subnet_tags
           value: '{"owner": "semaphore", "managed": "terraform", "usage": "vnet"}'
+        - name: TF_VAR_csp_url
+          value: "https://csp.eu.infoblox.com"
       secrets:
         - name: azure-credentials
         - name: infoblox-credentials
