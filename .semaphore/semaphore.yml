@@ -1,0 +1,131 @@
+version: v1.0
+name: Azure VNET with Infoblox IPAM - Terraform Pipeline
+
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu1804
+
+blocks:
+  - name: "Terraform Plan"
+    task:
+      env_vars:
+        - name: TF_VAR_subscription_id
+          from_secret: AZURE_SUBSCRIPTION_ID
+        - name: TF_VAR_csp_url
+          from_secret: INFOBLOX_CSP_URL
+        - name: TF_VAR_api_key
+          from_secret: INFOBLOX_API_KEY
+        - name: TF_VAR_region
+          value: "West Europe"
+        - name: TF_VAR_resource_group
+          value: "blox42-rg"
+        - name: TF_VAR_infoblox_address_block_name
+          value: "Azure VNET Address Block"
+        - name: TF_VAR_vnet_prefix
+          value: "blox42-demo"
+        - name: TF_VAR_vnets
+          value: '["vnet1", "vnet2", "vnet3", "vnet4", "vnet5"]'
+        - name: TF_VAR_subnet_cidr
+          value: "24"
+        - name: TF_VAR_subnet_comment
+          value: "Terraform Demo Entry via Semaphore CI/CD"
+        - name: TF_VAR_subnet_tags
+          value: '{"owner": "semaphore", "managed": "terraform", "usage": "vnet"}'
+      secrets:
+        - name: azure-credentials
+        - name: infoblox-credentials
+      prologue:
+        commands:
+          - checkout
+          - cache restore terraform-$SEMAPHORE_GIT_BRANCH-$(checksum *.tf)
+          - cache restore terraform-plugins
+      jobs:
+      - name: Plan
+        commands:
+          # Install Terraform
+          - wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          - echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          - sudo apt update && sudo apt install terraform=1.5.7-1
+          
+          # Install Azure CLI
+          - curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          
+          # Terraform initialization and plan
+          - terraform --version
+          - terraform init -upgrade
+          - terraform validate
+          - terraform plan -out=tfplan
+          
+          # Store plan as artifact
+          - artifact push project tfplan
+      epilogue:
+        commands:
+          - cache store terraform-$SEMAPHORE_GIT_BRANCH-$(checksum *.tf) .terraform
+          - cache store terraform-plugins ~/.terraform.d/plugin-cache
+
+  - name: "Terraform Apply"
+    run:
+      when: "branch = 'main' AND result_thread.1.result = 'passed'"
+    task:
+      env_vars:
+        - name: TF_VAR_subscription_id
+          from_secret: AZURE_SUBSCRIPTION_ID
+        - name: TF_VAR_csp_url
+          from_secret: INFOBLOX_CSP_URL
+        - name: TF_VAR_api_key
+          from_secret: INFOBLOX_API_KEY
+        - name: TF_VAR_region
+          value: "West Europe"
+        - name: TF_VAR_resource_group
+          value: "blox42-rg"
+        - name: TF_VAR_infoblox_address_block_name
+          value: "Azure VNET Address Block"
+        - name: TF_VAR_vnet_prefix
+          value: "blox42-demo"
+        - name: TF_VAR_vnets
+          value: '["vnet1", "vnet2", "vnet3", "vnet4", "vnet5"]'
+        - name: TF_VAR_subnet_cidr
+          value: "24"
+        - name: TF_VAR_subnet_comment
+          value: "Terraform Demo Entry via Semaphore CI/CD"
+        - name: TF_VAR_subnet_tags
+          value: '{"owner": "semaphore", "managed": "terraform", "usage": "vnet"}'
+      secrets:
+        - name: azure-credentials
+        - name: infoblox-credentials
+      prologue:
+        commands:
+          - checkout
+          - cache restore terraform-$SEMAPHORE_GIT_BRANCH-$(checksum *.tf)
+          - cache restore terraform-plugins
+      jobs:
+      - name: Apply
+        commands:
+          # Install Terraform
+          - wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          - echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          - sudo apt update && sudo apt install terraform=1.5.7-1
+          
+          # Install Azure CLI
+          - curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          
+          # Retrieve and apply plan
+          - artifact pull project tfplan || true
+          - terraform --version
+          - terraform init -upgrade
+          - |
+            if [ -f tfplan ]; then
+              echo "Applying existing plan..."
+              terraform apply tfplan
+            else
+              echo "No plan found, running fresh plan and apply..."
+              terraform plan -out=tfplan
+              terraform apply tfplan
+            fi
+
+promotions:
+  - name: "Manual Destroy"
+    pipeline_file: destroy.yml
+    auto_promote:
+      when: false
