@@ -4,6 +4,24 @@ variable "subscription_id" {
   sensitive   = true
 }
 
+variable "tenant_id" {
+  description = "Azure Tenant ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "client_id" {
+  description = "Azure Service Principal Client ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "client_secret" {
+  description = "Azure Service Principal Client Secret"
+  type        = string
+  sensitive   = true
+}
+
 variable "csp_url" {
   description = "Infoblox CSP URL"
   type        = string
